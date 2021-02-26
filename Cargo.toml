@@ -12,8 +12,11 @@ readme = "README.md"
 anyhow = "1.0.26"
 bincode = "1.1.2"
 serde = "1.0.104"
-filecoin-proofs-v1 = { package = "filecoin-proofs", version = "5.4.0", default-features = false, features = ["gpu"] }
+filecoin-proofs-v1 = { package = "filecoin-proofs", version = "5.4.0", default-features = false, features = ["gpu"], git = "https://github.com/s1m0n21/petal-fil-proofs", branch = "qiniu-kodo" }
 bellperson = { version = "0.12", default-features = false, features = ["gpu"] }
+rayon = "1.1.0"
+log = "0.4.7"
+qiniu = { package = "qiniu", git = "https://github.com/s1m0n21/petal-fil-proofs", branch = "qiniu-kodo" }
 
 [features]
 default = ["pairing"]
