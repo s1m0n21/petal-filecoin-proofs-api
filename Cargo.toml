@@ -13,10 +13,10 @@ anyhow = "1.0.26"
 bellperson = { version = "0.13", default-features = false }
 bincode = "1.1.2"
 serde = "1.0.104"
-filecoin-proofs-v1 = { package = "filecoin-proofs", version = "~7.0", default-features = false }
-filecoin-hashers = { version = "~2.0", default-features = false, features = ["poseidon", "sha256"] }
-fr32 = { version = "~0.2", default-features = false }
-storage-proofs-core = { version = "~7.0", default-features = false }
+filecoin-proofs-v1 = { package = "filecoin-proofs", version = "~7.0", default-features = false, git = "https://github.com/s1m0n21/petal-fil-proofs", branch = "releases/v7.0.1" }
+filecoin-hashers = { version = "~2.0", default-features = false, features = ["poseidon", "sha256"], git = "https://github.com/s1m0n21/petal-fil-proofs", branch = "releases/v7.0.1" }
+fr32 = { version = "~0.2", default-features = false, git = "https://github.com/s1m0n21/petal-fil-proofs", branch = "releases/v7.0.1" }
+storage-proofs-core = { version = "~7.0", default-features = false, git = "https://github.com/s1m0n21/petal-fil-proofs", branch = "releases/v7.0.1" }
 
 [features]
 default = ["pairing", "gpu"]
