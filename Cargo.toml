@@ -1,6 +1,6 @@
 [package]
 name = "filecoin-proofs-api"
-version = "5.4.1"
+version = "8.0.1"
 description = "API to interact with the proofs system in Filecoin"
 authors = ["dignifiedquire <me@dignifiedquire.com>"]
 edition = "2018"
@@ -10,15 +10,19 @@ readme = "README.md"
 
 [dependencies]
 anyhow = "1.0.26"
+bellperson = { version = "0.14.0", default-features = false }
 bincode = "1.1.2"
 serde = "1.0.104"
-filecoin-proofs-v1 = { package = "filecoin-proofs", version = "5.4.0", default-features = false, features = ["gpu"], git = "https://github.com/s1m0n21/petal-fil-proofs", branch = "qiniu-kodo" }
-bellperson = { version = "0.12.3", default-features = false, features = ["gpu"], git = "https://github.com/s1m0n21/bellperson-pi" }
+filecoin-proofs-v1 = { package = "filecoin-proofs", version = "~8.0", git = "https://github.com/s1m0n21/petal-fil-proofs", branch = "qiniu-kodo", default-features = false }
+filecoin-hashers = { git = "https://github.com/s1m0n21/petal-fil-proofs", branch = "qiniu-kodo", version = "~3.0", default-features = false, features = ["poseidon", "sha256"] }
+fr32 = { version = "~1.0", default-features = false, git = "https://github.com/s1m0n21/petal-fil-proofs", branch = "qiniu-kodo" }
+storage-proofs-core = { git = "https://github.com/s1m0n21/petal-fil-proofs", branch = "qiniu-kodo", version = "~8.0", default-features = false }
 rayon = "1.1.0"
-log = "0.4.7"
-qiniu = { package = "qiniu", git = "https://github.com/s1m0n21/petal-fil-proofs", branch = "qiniu-kodo" }
+log = "0.4.14"
+qiniu = { package = "qiniu-download", version = "1.0.7" }
 
 [features]
-default = ["pairing"]
-pairing = ["filecoin-proofs-v1/pairing", "bellperson/pairing"]
-blst = ["filecoin-proofs-v1/blst", "bellperson/blst"]
+default = ["pairing", "gpu"]
+pairing = ["filecoin-proofs-v1/pairing", "bellperson/pairing", "storage-proofs-core/pairing", "fr32/pairing"]
+blst = ["filecoin-proofs-v1/blst", "bellperson/blst", "storage-proofs-core/blst", "fr32/blst"]
+gpu = ["filecoin-proofs-v1/gpu", "filecoin-hashers/gpu", "storage-proofs-core/gpu", "bellperson/gpu", "fr32/gpu"]

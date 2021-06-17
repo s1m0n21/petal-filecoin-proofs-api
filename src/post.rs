@@ -1,20 +1,19 @@
 use std::collections::{BTreeMap, HashMap};
 
 use anyhow::{ensure, Result};
-use filecoin_proofs_v1::types::MerkleTreeTrait;
 use filecoin_proofs_v1::with_shape;
 
 use crate::types::VanillaProofBytes;
 use crate::{
-    ChallengeSeed, FallbackPoStSectorProof, PoStType, PrivateReplicaInfo, ProverId,
-    PublicReplicaInfo, RegisteredPoStProof, SectorId, SnarkProof, Version,
+    ChallengeSeed, FallbackPoStSectorProof, MerkleTreeTrait, PoStType, PrivateReplicaInfo,
+    ProverId, PublicReplicaInfo, RegisteredPoStProof, SectorId, SnarkProof,
 };
 
 use rayon::prelude::*;
 use std::time::SystemTime;
 use log::info;
 
-use qiniu::service::storage::download::set_download_start_time;
+use qiniu::set_download_start_time;
 
 pub fn generate_winning_post_sector_challenge(
     proof_type: RegisteredPoStProof,
@@ -218,7 +217,7 @@ fn generate_winning_post_inner<Tree: 'static + MerkleTreeTrait>(
     prover_id: ProverId,
 ) -> Result<Vec<(RegisteredPoStProof, SnarkProof)>> {
     let timestamp = SystemTime::now();
-    set_download_start_time(&timestamp);
+    set_download_start_time(timestamp);
     let mut replica_map:HashMap<_, _> = replicas.par_iter().map( |(id, info)| {
         let PrivateReplicaInfo {
             registered_proof: _registered_proof,
@@ -234,7 +233,7 @@ fn generate_winning_post_inner<Tree: 'static + MerkleTreeTrait>(
         );
         (id.to_string(), info_v1)
     }).collect();
-    info!("QN: winning init p_aux {} time {:?}", replicas.len(), timestamp);
+    info!("winning init p_aux {} qiniu-time {:?}", replicas.len(), timestamp);
     let mut replicas_v1 = Vec::new();
     for (id, info) in replicas.iter() {
         ensure!(
@@ -403,7 +402,7 @@ fn generate_window_post_inner<Tree: 'static + MerkleTreeTrait>(
     prover_id: ProverId,
 ) -> Result<Vec<(RegisteredPoStProof, SnarkProof)>> {
     let timestamp = SystemTime::now();
-    set_download_start_time(&timestamp);
+    set_download_start_time(timestamp);
     let mut replica_map:HashMap<_, _> = replicas.par_iter().map( |(id, info)| {
         let PrivateReplicaInfo {
             registered_proof: _registered_proof,
@@ -418,7 +417,7 @@ fn generate_window_post_inner<Tree: 'static + MerkleTreeTrait>(
         );
         (id.to_string(), info_v1)
     }).collect();
-    info!("QN: window init p_aux {} time {:?}", replicas.len(), timestamp.elapsed());
+    info!("window init p_aux {} qiniu-time {:?}", replicas.len(), timestamp.elapsed());
     let mut replicas_v1 = BTreeMap::new();
 
     for (id, info) in replicas.iter() {
@@ -459,7 +458,7 @@ pub fn verify_window_post(
         "invalid post type provided"
     );
     ensure!(
-        registered_post_proof_type_v1.version() == Version::V1,
+        registered_post_proof_type_v1.major_version() == 1,
         "only V1 supported"
     );
 

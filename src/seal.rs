@@ -3,18 +3,24 @@ use std::io::{Read, Seek, Write};
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, ensure, Error, Result};
+use bellperson::bls::Fr;
+use filecoin_hashers::Hasher;
+
 use filecoin_proofs_v1::constants::{
-    SectorShape2KiB, SectorShape32GiB, SectorShape512MiB, SectorShape64GiB, SectorShape8MiB,
+    SectorShape16KiB, SectorShape16MiB, SectorShape1GiB, SectorShape2KiB, SectorShape32GiB,
+    SectorShape32KiB, SectorShape4KiB, SectorShape512MiB, SectorShape64GiB, SectorShape8MiB,
+    SECTOR_SIZE_16_KIB, SECTOR_SIZE_16_MIB, SECTOR_SIZE_1_GIB, SECTOR_SIZE_2_KIB,
+    SECTOR_SIZE_32_GIB, SECTOR_SIZE_32_KIB, SECTOR_SIZE_4_KIB, SECTOR_SIZE_512_MIB,
+    SECTOR_SIZE_64_GIB, SECTOR_SIZE_8_MIB,
 };
-use filecoin_proofs_v1::storage_proofs::hasher::Hasher;
 use filecoin_proofs_v1::types::MerkleTreeTrait;
 use filecoin_proofs_v1::types::VanillaSealProof as RawVanillaSealProof;
 use filecoin_proofs_v1::{with_shape, Labels as RawLabels};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Commitment, PieceInfo, ProverId, RegisteredSealProof, SectorId, Ticket, UnpaddedByteIndex,
-    UnpaddedBytesAmount, Version,
+    AggregateSnarkProof, Commitment, PieceInfo, ProverId, RegisteredAggregationProof,
+    RegisteredSealProof, SectorId, Ticket, UnpaddedByteIndex, UnpaddedBytesAmount,
 };
 
 /// The output of `seal_pre_commit_phase1`.
@@ -44,35 +50,41 @@ impl Labels {
         use RegisteredSealProof::*;
         match proof {
             StackedDrg2KiBV1 | StackedDrg2KiBV1_1 => {
-                if let Some(labels) = Any::downcast_ref::<RawLabels<SectorShape2KiB>>(labels) {
+                if let Some(labels) = <dyn Any>::downcast_ref::<RawLabels<SectorShape2KiB>>(labels)
+                {
                     Ok(Labels::StackedDrg2KiBV1(labels.clone()))
                 } else {
                     bail!("invalid labels provided")
                 }
             }
             StackedDrg8MiBV1 | StackedDrg8MiBV1_1 => {
-                if let Some(labels) = Any::downcast_ref::<RawLabels<SectorShape8MiB>>(labels) {
+                if let Some(labels) = <dyn Any>::downcast_ref::<RawLabels<SectorShape8MiB>>(labels)
+                {
                     Ok(Labels::StackedDrg8MiBV1(labels.clone()))
                 } else {
                     bail!("invalid labels provided")
                 }
             }
             StackedDrg512MiBV1 | StackedDrg512MiBV1_1 => {
-                if let Some(labels) = Any::downcast_ref::<RawLabels<SectorShape512MiB>>(labels) {
+                if let Some(labels) =
+                    <dyn Any>::downcast_ref::<RawLabels<SectorShape512MiB>>(labels)
+                {
                     Ok(Labels::StackedDrg512MiBV1(labels.clone()))
                 } else {
                     bail!("invalid labels provided")
                 }
             }
             StackedDrg32GiBV1 | StackedDrg32GiBV1_1 => {
-                if let Some(labels) = Any::downcast_ref::<RawLabels<SectorShape32GiB>>(labels) {
+                if let Some(labels) = <dyn Any>::downcast_ref::<RawLabels<SectorShape32GiB>>(labels)
+                {
                     Ok(Labels::StackedDrg32GiBV1(labels.clone()))
                 } else {
                     bail!("invalid labels provided")
                 }
             }
             StackedDrg64GiBV1 | StackedDrg64GiBV1_1 => {
-                if let Some(labels) = Any::downcast_ref::<RawLabels<SectorShape64GiB>>(labels) {
+                if let Some(labels) = <dyn Any>::downcast_ref::<RawLabels<SectorShape64GiB>>(labels)
+                {
                     Ok(Labels::StackedDrg64GiBV1(labels.clone()))
                 } else {
                     bail!("invalid labels provided")
@@ -91,35 +103,35 @@ impl<Tree: 'static + MerkleTreeTrait> TryInto<RawLabels<Tree>> for Labels {
 
         match self {
             StackedDrg2KiBV1(raw) => {
-                if let Some(raw) = Any::downcast_ref::<RawLabels<Tree>>(&raw) {
+                if let Some(raw) = <dyn Any>::downcast_ref::<RawLabels<Tree>>(&raw) {
                     Ok(raw.clone())
                 } else {
                     bail!("cannot convert 2kib into different structure")
                 }
             }
             StackedDrg8MiBV1(raw) => {
-                if let Some(raw) = Any::downcast_ref::<RawLabels<Tree>>(&raw) {
+                if let Some(raw) = <dyn Any>::downcast_ref::<RawLabels<Tree>>(&raw) {
                     Ok(raw.clone())
                 } else {
                     bail!("cannot convert 8Mib into different structure")
                 }
             }
             StackedDrg512MiBV1(raw) => {
-                if let Some(raw) = Any::downcast_ref::<RawLabels<Tree>>(&raw) {
+                if let Some(raw) = <dyn Any>::downcast_ref::<RawLabels<Tree>>(&raw) {
                     Ok(raw.clone())
                 } else {
                     bail!("cannot convert 512Mib into different structure")
                 }
             }
             StackedDrg32GiBV1(raw) => {
-                if let Some(raw) = Any::downcast_ref::<RawLabels<Tree>>(&raw) {
+                if let Some(raw) = <dyn Any>::downcast_ref::<RawLabels<Tree>>(&raw) {
                     Ok(raw.clone())
                 } else {
                     bail!("cannot convert 32gib into different structure")
                 }
             }
             StackedDrg64GiBV1(raw) => {
-                if let Some(raw) = Any::downcast_ref::<RawLabels<Tree>>(&raw) {
+                if let Some(raw) = <dyn Any>::downcast_ref::<RawLabels<Tree>>(&raw) {
                     Ok(raw.clone())
                 } else {
                     bail!("cannot convert 64gib into different structure")
@@ -167,8 +179,9 @@ impl VanillaSealProof {
         use RegisteredSealProof::*;
         match proof {
             StackedDrg2KiBV1 | StackedDrg2KiBV1_1 => {
-                if let Some(proofs) =
-                    Any::downcast_ref::<Vec<Vec<RawVanillaSealProof<SectorShape2KiB>>>>(proofs)
+                if let Some(proofs) = <dyn Any>::downcast_ref::<
+                    Vec<Vec<RawVanillaSealProof<SectorShape2KiB>>>,
+                >(proofs)
                 {
                     Ok(VanillaSealProof::StackedDrg2KiBV1(proofs.clone()))
                 } else {
@@ -176,8 +189,9 @@ impl VanillaSealProof {
                 }
             }
             StackedDrg8MiBV1 | StackedDrg8MiBV1_1 => {
-                if let Some(proofs) =
-                    Any::downcast_ref::<Vec<Vec<RawVanillaSealProof<SectorShape8MiB>>>>(proofs)
+                if let Some(proofs) = <dyn Any>::downcast_ref::<
+                    Vec<Vec<RawVanillaSealProof<SectorShape8MiB>>>,
+                >(proofs)
                 {
                     Ok(VanillaSealProof::StackedDrg8MiBV1(proofs.clone()))
                 } else {
@@ -185,8 +199,9 @@ impl VanillaSealProof {
                 }
             }
             StackedDrg512MiBV1 | StackedDrg512MiBV1_1 => {
-                if let Some(proofs) =
-                    Any::downcast_ref::<Vec<Vec<RawVanillaSealProof<SectorShape512MiB>>>>(proofs)
+                if let Some(proofs) = <dyn Any>::downcast_ref::<
+                    Vec<Vec<RawVanillaSealProof<SectorShape512MiB>>>,
+                >(proofs)
                 {
                     Ok(VanillaSealProof::StackedDrg512MiBV1(proofs.clone()))
                 } else {
@@ -194,8 +209,9 @@ impl VanillaSealProof {
                 }
             }
             StackedDrg32GiBV1 | StackedDrg32GiBV1_1 => {
-                if let Some(proofs) =
-                    Any::downcast_ref::<Vec<Vec<RawVanillaSealProof<SectorShape32GiB>>>>(proofs)
+                if let Some(proofs) = <dyn Any>::downcast_ref::<
+                    Vec<Vec<RawVanillaSealProof<SectorShape32GiB>>>,
+                >(proofs)
                 {
                     Ok(VanillaSealProof::StackedDrg32GiBV1(proofs.clone()))
                 } else {
@@ -203,8 +219,9 @@ impl VanillaSealProof {
                 }
             }
             StackedDrg64GiBV1 | StackedDrg64GiBV1_1 => {
-                if let Some(proofs) =
-                    Any::downcast_ref::<Vec<Vec<RawVanillaSealProof<SectorShape64GiB>>>>(proofs)
+                if let Some(proofs) = <dyn Any>::downcast_ref::<
+                    Vec<Vec<RawVanillaSealProof<SectorShape64GiB>>>,
+                >(proofs)
                 {
                     Ok(VanillaSealProof::StackedDrg64GiBV1(proofs.clone()))
                 } else {
@@ -226,35 +243,45 @@ impl<Tree: 'static + MerkleTreeTrait> TryInto<Vec<Vec<RawVanillaSealProof<Tree>>
 
         match self {
             StackedDrg2KiBV1(raw) => {
-                if let Some(raw) = Any::downcast_ref::<Vec<Vec<RawVanillaSealProof<Tree>>>>(&raw) {
+                if let Some(raw) =
+                    <dyn Any>::downcast_ref::<Vec<Vec<RawVanillaSealProof<Tree>>>>(&raw)
+                {
                     Ok(raw.clone())
                 } else {
                     bail!("cannot convert 2kib into different structure")
                 }
             }
             StackedDrg8MiBV1(raw) => {
-                if let Some(raw) = Any::downcast_ref::<Vec<Vec<RawVanillaSealProof<Tree>>>>(&raw) {
+                if let Some(raw) =
+                    <dyn Any>::downcast_ref::<Vec<Vec<RawVanillaSealProof<Tree>>>>(&raw)
+                {
                     Ok(raw.clone())
                 } else {
                     bail!("cannot convert 8Mib into different structure")
                 }
             }
             StackedDrg512MiBV1(raw) => {
-                if let Some(raw) = Any::downcast_ref::<Vec<Vec<RawVanillaSealProof<Tree>>>>(&raw) {
+                if let Some(raw) =
+                    <dyn Any>::downcast_ref::<Vec<Vec<RawVanillaSealProof<Tree>>>>(&raw)
+                {
                     Ok(raw.clone())
                 } else {
                     bail!("cannot convert 512Mib into different structure")
                 }
             }
             StackedDrg32GiBV1(raw) => {
-                if let Some(raw) = Any::downcast_ref::<Vec<Vec<RawVanillaSealProof<Tree>>>>(&raw) {
+                if let Some(raw) =
+                    <dyn Any>::downcast_ref::<Vec<Vec<RawVanillaSealProof<Tree>>>>(&raw)
+                {
                     Ok(raw.clone())
                 } else {
                     bail!("cannot convert 32gib into different structure")
                 }
             }
             StackedDrg64GiBV1(raw) => {
-                if let Some(raw) = Any::downcast_ref::<Vec<Vec<RawVanillaSealProof<Tree>>>>(&raw) {
+                if let Some(raw) =
+                    <dyn Any>::downcast_ref::<Vec<Vec<RawVanillaSealProof<Tree>>>>(&raw)
+                {
                     Ok(raw.clone())
                 } else {
                     bail!("cannot convert 64gib into different structure")
@@ -291,7 +318,7 @@ where
     T: AsRef<Path>,
 {
     ensure!(
-        registered_proof.version() == Version::V1,
+        registered_proof.major_version() == 1,
         "unusupported version"
     );
 
@@ -356,7 +383,7 @@ where
     S: AsRef<Path>,
 {
     ensure!(
-        phase1_output.registered_proof.version() == Version::V1,
+        phase1_output.registered_proof.major_version() == 1,
         "unusupported version"
     );
 
@@ -428,7 +455,7 @@ pub fn seal_commit_phase1<T: AsRef<Path>>(
     piece_infos: &[PieceInfo],
 ) -> Result<SealCommitPhase1Output> {
     ensure!(
-        pre_commit.registered_proof.version() == Version::V1,
+        pre_commit.registered_proof.major_version() == 1,
         "unusupported version"
     );
 
@@ -488,7 +515,7 @@ fn seal_commit_phase1_inner<Tree: 'static + MerkleTreeTrait>(
         ticket,
     } = output;
 
-    let replica_id: bellperson::bls::Fr = replica_id.into();
+    let replica_id: Fr = replica_id.into();
     Ok(SealCommitPhase1Output {
         registered_proof,
         vanilla_proofs: VanillaSealProof::from_raw::<Tree>(registered_proof, &vanilla_proofs)?,
@@ -506,7 +533,7 @@ pub fn seal_commit_phase2(
     sector_id: SectorId,
 ) -> Result<SealCommitPhase2Output> {
     ensure!(
-        phase1_output.registered_proof.version() == Version::V1,
+        phase1_output.registered_proof.major_version() == 1,
         "unusupported version"
     );
 
@@ -535,7 +562,7 @@ fn seal_commit_phase2_inner<Tree: 'static + MerkleTreeTrait>(
     } = phase1_output;
 
     let config = registered_proof.as_v1_config();
-    let replica_id: bellperson::bls::Fr = replica_id.into();
+    let replica_id: Fr = replica_id.into();
 
     let co = filecoin_proofs_v1::types::SealCommitPhase1Output {
         vanilla_proofs: vanilla_proofs.try_into()?,
@@ -553,13 +580,147 @@ fn seal_commit_phase2_inner<Tree: 'static + MerkleTreeTrait>(
     })
 }
 
+pub fn get_seal_inputs(
+    registered_proof: RegisteredSealProof,
+    comm_r: Commitment,
+    comm_d: Commitment,
+    prover_id: ProverId,
+    sector_id: SectorId,
+    ticket: Ticket,
+    seed: Ticket,
+) -> Result<Vec<Vec<Fr>>> {
+    ensure!(
+        registered_proof.major_version() == 1,
+        "unusupported version"
+    );
+
+    with_shape!(
+        u64::from(registered_proof.sector_size()),
+        get_seal_inputs_inner,
+        registered_proof,
+        comm_r,
+        comm_d,
+        prover_id,
+        sector_id,
+        ticket,
+        seed,
+    )
+}
+
+pub fn get_seal_inputs_inner<Tree: 'static + MerkleTreeTrait>(
+    registered_proof: RegisteredSealProof,
+    comm_r: Commitment,
+    comm_d: Commitment,
+    prover_id: ProverId,
+    sector_id: SectorId,
+    ticket: Ticket,
+    seed: Ticket,
+) -> Result<Vec<Vec<Fr>>> {
+    let config = registered_proof.as_v1_config();
+
+    filecoin_proofs_v1::get_seal_inputs::<Tree>(
+        config, comm_r, comm_d, prover_id, sector_id, ticket, seed,
+    )
+}
+
+pub fn aggregate_seal_commit_proofs(
+    registered_proof: RegisteredSealProof,
+    registered_aggregation: RegisteredAggregationProof,
+    comm_rs: &[Commitment],
+    seeds: &[Ticket],
+    commit_outputs: &[SealCommitPhase2Output],
+) -> Result<AggregateSnarkProof> {
+    ensure!(
+        registered_proof.major_version() == 1,
+        "unusupported version"
+    );
+
+    ensure!(
+        registered_aggregation == RegisteredAggregationProof::SnarkPackV1,
+        "unusupported aggregation version"
+    );
+
+    with_shape!(
+        u64::from(registered_proof.sector_size()),
+        aggregate_seal_commit_proofs_inner,
+        registered_proof,
+        comm_rs,
+        seeds,
+        commit_outputs,
+    )
+}
+
+pub fn aggregate_seal_commit_proofs_inner<Tree: 'static + MerkleTreeTrait>(
+    registered_proof: RegisteredSealProof,
+    comm_rs: &[Commitment],
+    seeds: &[Ticket],
+    commit_outputs: &[SealCommitPhase2Output],
+) -> Result<AggregateSnarkProof> {
+    let config = registered_proof.as_v1_config();
+    let outputs: Vec<filecoin_proofs_v1::types::SealCommitOutput> = commit_outputs
+        .iter()
+        .map(|co| filecoin_proofs_v1::types::SealCommitOutput {
+            proof: co.proof.clone(),
+        })
+        .collect();
+
+    filecoin_proofs_v1::aggregate_seal_commit_proofs::<Tree>(config, comm_rs, seeds, &outputs)
+}
+
+pub fn verify_aggregate_seal_commit_proofs(
+    registered_proof: RegisteredSealProof,
+    registered_aggregation: RegisteredAggregationProof,
+    aggregate_proof_bytes: AggregateSnarkProof,
+    comm_rs: &[Commitment],
+    seeds: &[Ticket],
+    commit_inputs: Vec<Vec<Fr>>,
+) -> Result<bool> {
+    ensure!(
+        registered_proof.major_version() == 1,
+        "unusupported version"
+    );
+
+    ensure!(
+        registered_aggregation == RegisteredAggregationProof::SnarkPackV1,
+        "unusupported aggregation version"
+    );
+
+    with_shape!(
+        u64::from(registered_proof.sector_size()),
+        verify_aggregate_seal_commit_proofs_inner,
+        registered_proof,
+        aggregate_proof_bytes,
+        comm_rs,
+        seeds,
+        commit_inputs,
+    )
+}
+
+pub fn verify_aggregate_seal_commit_proofs_inner<Tree: 'static + MerkleTreeTrait>(
+    registered_proof: RegisteredSealProof,
+    aggregate_proof_bytes: AggregateSnarkProof,
+    comm_rs: &[Commitment],
+    seeds: &[Ticket],
+    commit_inputs: Vec<Vec<Fr>>,
+) -> Result<bool> {
+    let config = registered_proof.as_v1_config();
+
+    filecoin_proofs_v1::verify_aggregate_seal_commit_proofs::<Tree>(
+        config,
+        aggregate_proof_bytes,
+        comm_rs,
+        seeds,
+        commit_inputs,
+    )
+}
+
 pub fn fauxrep<R: AsRef<Path>, S: AsRef<Path>>(
     registered_proof: RegisteredSealProof,
     cache_path: R,
     replica_path: S,
 ) -> Result<Commitment> {
     ensure!(
-        registered_proof.version() == Version::V1,
+        registered_proof.major_version() == 1,
         "unusupported version"
     );
 
@@ -570,75 +731,35 @@ pub fn fauxrep<R: AsRef<Path>, S: AsRef<Path>>(
     //
     // Note also that not all of these sector sizes are production, so some could be pruned.
     match sector_size {
-        filecoin_proofs_v1::constants::SECTOR_SIZE_2_KIB => {
-            filecoin_proofs_v1::fauxrep::<_, _, filecoin_proofs_v1::constants::SectorShape2KiB>(
-                config,
-                cache_path,
-                replica_path,
-            )
+        SECTOR_SIZE_2_KIB => {
+            filecoin_proofs_v1::fauxrep::<_, _, SectorShape2KiB>(config, cache_path, replica_path)
         }
-        filecoin_proofs_v1::constants::SECTOR_SIZE_4_KIB => {
-            filecoin_proofs_v1::fauxrep::<_, _, filecoin_proofs_v1::constants::SectorShape4KiB>(
-                config,
-                cache_path,
-                replica_path,
-            )
+        SECTOR_SIZE_4_KIB => {
+            filecoin_proofs_v1::fauxrep::<_, _, SectorShape4KiB>(config, cache_path, replica_path)
         }
-        filecoin_proofs_v1::constants::SECTOR_SIZE_16_KIB => {
-            filecoin_proofs_v1::fauxrep::<_, _, filecoin_proofs_v1::constants::SectorShape16KiB>(
-                config,
-                cache_path,
-                replica_path,
-            )
+        SECTOR_SIZE_16_KIB => {
+            filecoin_proofs_v1::fauxrep::<_, _, SectorShape16KiB>(config, cache_path, replica_path)
         }
-        filecoin_proofs_v1::constants::SECTOR_SIZE_32_KIB => {
-            filecoin_proofs_v1::fauxrep::<_, _, filecoin_proofs_v1::constants::SectorShape32KiB>(
-                config,
-                cache_path,
-                replica_path,
-            )
+        SECTOR_SIZE_32_KIB => {
+            filecoin_proofs_v1::fauxrep::<_, _, SectorShape32KiB>(config, cache_path, replica_path)
         }
-        filecoin_proofs_v1::constants::SECTOR_SIZE_8_MIB => {
-            filecoin_proofs_v1::fauxrep::<_, _, filecoin_proofs_v1::constants::SectorShape8MiB>(
-                config,
-                cache_path,
-                replica_path,
-            )
+        SECTOR_SIZE_8_MIB => {
+            filecoin_proofs_v1::fauxrep::<_, _, SectorShape8MiB>(config, cache_path, replica_path)
         }
-        filecoin_proofs_v1::constants::SECTOR_SIZE_16_MIB => {
-            filecoin_proofs_v1::fauxrep::<_, _, filecoin_proofs_v1::constants::SectorShape16MiB>(
-                config,
-                cache_path,
-                replica_path,
-            )
+        SECTOR_SIZE_16_MIB => {
+            filecoin_proofs_v1::fauxrep::<_, _, SectorShape16MiB>(config, cache_path, replica_path)
         }
-        filecoin_proofs_v1::constants::SECTOR_SIZE_512_MIB => {
-            filecoin_proofs_v1::fauxrep::<_, _, filecoin_proofs_v1::constants::SectorShape512MiB>(
-                config,
-                cache_path,
-                replica_path,
-            )
+        SECTOR_SIZE_512_MIB => {
+            filecoin_proofs_v1::fauxrep::<_, _, SectorShape512MiB>(config, cache_path, replica_path)
         }
-        filecoin_proofs_v1::constants::SECTOR_SIZE_1_GIB => {
-            filecoin_proofs_v1::fauxrep::<_, _, filecoin_proofs_v1::constants::SectorShape1GiB>(
-                config,
-                cache_path,
-                replica_path,
-            )
+        SECTOR_SIZE_1_GIB => {
+            filecoin_proofs_v1::fauxrep::<_, _, SectorShape1GiB>(config, cache_path, replica_path)
         }
-        filecoin_proofs_v1::constants::SECTOR_SIZE_32_GIB => {
-            filecoin_proofs_v1::fauxrep::<_, _, filecoin_proofs_v1::constants::SectorShape32GiB>(
-                config,
-                cache_path,
-                replica_path,
-            )
+        SECTOR_SIZE_32_GIB => {
+            filecoin_proofs_v1::fauxrep::<_, _, SectorShape32GiB>(config, cache_path, replica_path)
         }
-        filecoin_proofs_v1::constants::SECTOR_SIZE_64_GIB => {
-            filecoin_proofs_v1::fauxrep::<_, _, filecoin_proofs_v1::constants::SectorShape64GiB>(
-                config,
-                cache_path,
-                replica_path,
-            )
+        SECTOR_SIZE_64_GIB => {
+            filecoin_proofs_v1::fauxrep::<_, _, SectorShape64GiB>(config, cache_path, replica_path)
         }
         _ => panic!("unsupported sector size: {}", sector_size),
     }
@@ -650,7 +771,7 @@ pub fn fauxrep2<R: AsRef<Path>, S: AsRef<Path>>(
     existing_p_aux_path: S,
 ) -> Result<Commitment> {
     ensure!(
-        registered_proof.version() == Version::V1,
+        registered_proof.major_version() == 1,
         "unusupported version"
     );
 
@@ -660,65 +781,35 @@ pub fn fauxrep2<R: AsRef<Path>, S: AsRef<Path>>(
     //
     // Note also that not all of these sector sizes are production, so some could be pruned.
     match sector_size {
-        filecoin_proofs_v1::constants::SECTOR_SIZE_2_KIB => {
-            filecoin_proofs_v1::fauxrep2::<_, _, filecoin_proofs_v1::constants::SectorShape2KiB>(
-                cache_path,
-                existing_p_aux_path,
-            )
+        SECTOR_SIZE_2_KIB => {
+            filecoin_proofs_v1::fauxrep2::<_, _, SectorShape2KiB>(cache_path, existing_p_aux_path)
         }
-        filecoin_proofs_v1::constants::SECTOR_SIZE_4_KIB => {
-            filecoin_proofs_v1::fauxrep2::<_, _, filecoin_proofs_v1::constants::SectorShape4KiB>(
-                cache_path,
-                existing_p_aux_path,
-            )
+        SECTOR_SIZE_4_KIB => {
+            filecoin_proofs_v1::fauxrep2::<_, _, SectorShape4KiB>(cache_path, existing_p_aux_path)
         }
-        filecoin_proofs_v1::constants::SECTOR_SIZE_16_KIB => {
-            filecoin_proofs_v1::fauxrep2::<_, _, filecoin_proofs_v1::constants::SectorShape16KiB>(
-                cache_path,
-                existing_p_aux_path,
-            )
+        SECTOR_SIZE_16_KIB => {
+            filecoin_proofs_v1::fauxrep2::<_, _, SectorShape16KiB>(cache_path, existing_p_aux_path)
         }
-        filecoin_proofs_v1::constants::SECTOR_SIZE_32_KIB => {
-            filecoin_proofs_v1::fauxrep2::<_, _, filecoin_proofs_v1::constants::SectorShape32KiB>(
-                cache_path,
-                existing_p_aux_path,
-            )
+        SECTOR_SIZE_32_KIB => {
+            filecoin_proofs_v1::fauxrep2::<_, _, SectorShape32KiB>(cache_path, existing_p_aux_path)
         }
-        filecoin_proofs_v1::constants::SECTOR_SIZE_8_MIB => {
-            filecoin_proofs_v1::fauxrep2::<_, _, filecoin_proofs_v1::constants::SectorShape8MiB>(
-                cache_path,
-                existing_p_aux_path,
-            )
+        SECTOR_SIZE_8_MIB => {
+            filecoin_proofs_v1::fauxrep2::<_, _, SectorShape8MiB>(cache_path, existing_p_aux_path)
         }
-        filecoin_proofs_v1::constants::SECTOR_SIZE_16_MIB => {
-            filecoin_proofs_v1::fauxrep2::<_, _, filecoin_proofs_v1::constants::SectorShape16MiB>(
-                cache_path,
-                existing_p_aux_path,
-            )
+        SECTOR_SIZE_16_MIB => {
+            filecoin_proofs_v1::fauxrep2::<_, _, SectorShape16MiB>(cache_path, existing_p_aux_path)
         }
-        filecoin_proofs_v1::constants::SECTOR_SIZE_512_MIB => {
-            filecoin_proofs_v1::fauxrep2::<_, _, filecoin_proofs_v1::constants::SectorShape512MiB>(
-                cache_path,
-                existing_p_aux_path,
-            )
+        SECTOR_SIZE_512_MIB => {
+            filecoin_proofs_v1::fauxrep2::<_, _, SectorShape512MiB>(cache_path, existing_p_aux_path)
         }
-        filecoin_proofs_v1::constants::SECTOR_SIZE_1_GIB => {
-            filecoin_proofs_v1::fauxrep2::<_, _, filecoin_proofs_v1::constants::SectorShape1GiB>(
-                cache_path,
-                existing_p_aux_path,
-            )
+        SECTOR_SIZE_1_GIB => {
+            filecoin_proofs_v1::fauxrep2::<_, _, SectorShape1GiB>(cache_path, existing_p_aux_path)
         }
-        filecoin_proofs_v1::constants::SECTOR_SIZE_32_GIB => {
-            filecoin_proofs_v1::fauxrep2::<_, _, filecoin_proofs_v1::constants::SectorShape32GiB>(
-                cache_path,
-                existing_p_aux_path,
-            )
+        SECTOR_SIZE_32_GIB => {
+            filecoin_proofs_v1::fauxrep2::<_, _, SectorShape32GiB>(cache_path, existing_p_aux_path)
         }
-        filecoin_proofs_v1::constants::SECTOR_SIZE_64_GIB => {
-            filecoin_proofs_v1::fauxrep2::<_, _, filecoin_proofs_v1::constants::SectorShape64GiB>(
-                cache_path,
-                existing_p_aux_path,
-            )
+        SECTOR_SIZE_64_GIB => {
+            filecoin_proofs_v1::fauxrep2::<_, _, SectorShape64GiB>(cache_path, existing_p_aux_path)
         }
         _ => panic!("unsupported sector size: {}", sector_size),
     }
@@ -791,7 +882,7 @@ pub fn get_unsealed_range<T: Into<PathBuf> + AsRef<Path>>(
     num_bytes: UnpaddedBytesAmount,
 ) -> Result<UnpaddedBytesAmount> {
     ensure!(
-        registered_proof.version() == Version::V1,
+        registered_proof.major_version() == 1,
         "unusupported version"
     );
 
@@ -839,6 +930,154 @@ fn get_unsealed_range_inner<Tree: 'static + MerkleTreeTrait>(
     )
 }
 
+pub fn get_unsealed_range_mapped<T: Into<PathBuf> + AsRef<Path>, W: Write>(
+    registered_proof: RegisteredSealProof,
+    cache_path: T,
+    sealed_path: T,
+    unsealed_output: W,
+    prover_id: ProverId,
+    sector_id: SectorId,
+    comm_d: Commitment,
+    ticket: Ticket,
+    offset: UnpaddedByteIndex,
+    num_bytes: UnpaddedBytesAmount,
+) -> Result<UnpaddedBytesAmount> {
+    ensure!(
+        registered_proof.major_version() == 1,
+        "unusupported version"
+    );
+
+    let config = registered_proof.as_v1_config();
+    let sector_size: u64 = u64::from(registered_proof.sector_size());
+
+    // TODO: Clean-up this method, as it more or less unrolls the with_shape macro in order to pass along the R and W generics as well as the Tree.
+    //
+    // Note also that not all of these sector sizes are production, so some could be pruned.
+    match sector_size {
+        SECTOR_SIZE_2_KIB => filecoin_proofs_v1::unseal_range_mapped::<_, _, SectorShape2KiB>(
+            config,
+            cache_path,
+            sealed_path.into(),
+            unsealed_output,
+            prover_id,
+            sector_id,
+            comm_d,
+            ticket,
+            offset,
+            num_bytes,
+        ),
+        SECTOR_SIZE_4_KIB => filecoin_proofs_v1::unseal_range_mapped::<_, _, SectorShape4KiB>(
+            config,
+            cache_path,
+            sealed_path.into(),
+            unsealed_output,
+            prover_id,
+            sector_id,
+            comm_d,
+            ticket,
+            offset,
+            num_bytes,
+        ),
+        SECTOR_SIZE_16_KIB => filecoin_proofs_v1::unseal_range_mapped::<_, _, SectorShape16KiB>(
+            config,
+            cache_path,
+            sealed_path.into(),
+            unsealed_output,
+            prover_id,
+            sector_id,
+            comm_d,
+            ticket,
+            offset,
+            num_bytes,
+        ),
+        SECTOR_SIZE_32_KIB => filecoin_proofs_v1::unseal_range_mapped::<_, _, SectorShape32KiB>(
+            config,
+            cache_path,
+            sealed_path.into(),
+            unsealed_output,
+            prover_id,
+            sector_id,
+            comm_d,
+            ticket,
+            offset,
+            num_bytes,
+        ),
+        SECTOR_SIZE_8_MIB => filecoin_proofs_v1::unseal_range_mapped::<_, _, SectorShape8MiB>(
+            config,
+            cache_path,
+            sealed_path.into(),
+            unsealed_output,
+            prover_id,
+            sector_id,
+            comm_d,
+            ticket,
+            offset,
+            num_bytes,
+        ),
+        SECTOR_SIZE_16_MIB => filecoin_proofs_v1::unseal_range_mapped::<_, _, SectorShape16MiB>(
+            config,
+            cache_path,
+            sealed_path.into(),
+            unsealed_output,
+            prover_id,
+            sector_id,
+            comm_d,
+            ticket,
+            offset,
+            num_bytes,
+        ),
+        SECTOR_SIZE_512_MIB => filecoin_proofs_v1::unseal_range_mapped::<_, _, SectorShape512MiB>(
+            config,
+            cache_path,
+            sealed_path.into(),
+            unsealed_output,
+            prover_id,
+            sector_id,
+            comm_d,
+            ticket,
+            offset,
+            num_bytes,
+        ),
+        SECTOR_SIZE_1_GIB => filecoin_proofs_v1::unseal_range_mapped::<_, _, SectorShape1GiB>(
+            config,
+            cache_path,
+            sealed_path.into(),
+            unsealed_output,
+            prover_id,
+            sector_id,
+            comm_d,
+            ticket,
+            offset,
+            num_bytes,
+        ),
+        SECTOR_SIZE_32_GIB => filecoin_proofs_v1::unseal_range_mapped::<_, _, SectorShape32GiB>(
+            config,
+            cache_path,
+            sealed_path.into(),
+            unsealed_output,
+            prover_id,
+            sector_id,
+            comm_d,
+            ticket,
+            offset,
+            num_bytes,
+        ),
+        SECTOR_SIZE_64_GIB => filecoin_proofs_v1::unseal_range_mapped::<_, _, SectorShape64GiB>(
+            config,
+            cache_path,
+            sealed_path.into(),
+            unsealed_output,
+            prover_id,
+            sector_id,
+            comm_d,
+            ticket,
+            offset,
+            num_bytes,
+        ),
+        _ => panic!("unsupported sector size: {}", sector_size),
+    }
+}
+
 pub fn unseal_range<T: Into<PathBuf> + AsRef<Path>, R: Read, W: Write>(
     registered_proof: RegisteredSealProof,
     cache_path: T,
@@ -852,7 +1091,7 @@ pub fn unseal_range<T: Into<PathBuf> + AsRef<Path>, R: Read, W: Write>(
     num_bytes: UnpaddedBytesAmount,
 ) -> Result<UnpaddedBytesAmount> {
     ensure!(
-        registered_proof.version() == Version::V1,
+        registered_proof.major_version() == 1,
         "unusupported version"
     );
 
@@ -863,12 +1102,7 @@ pub fn unseal_range<T: Into<PathBuf> + AsRef<Path>, R: Read, W: Write>(
     //
     // Note also that not all of these sector sizes are production, so some could be pruned.
     match sector_size {
-        filecoin_proofs_v1::constants::SECTOR_SIZE_2_KIB => filecoin_proofs_v1::unseal_range::<
-            _,
-            _,
-            _,
-            filecoin_proofs_v1::constants::SectorShape2KiB,
-        >(
+        SECTOR_SIZE_2_KIB => filecoin_proofs_v1::unseal_range::<_, _, _, SectorShape2KiB>(
             config,
             cache_path,
             sealed_sector,
@@ -880,12 +1114,7 @@ pub fn unseal_range<T: Into<PathBuf> + AsRef<Path>, R: Read, W: Write>(
             offset,
             num_bytes,
         ),
-        filecoin_proofs_v1::constants::SECTOR_SIZE_4_KIB => filecoin_proofs_v1::unseal_range::<
-            _,
-            _,
-            _,
-            filecoin_proofs_v1::constants::SectorShape4KiB,
-        >(
+        SECTOR_SIZE_4_KIB => filecoin_proofs_v1::unseal_range::<_, _, _, SectorShape4KiB>(
             config,
             cache_path,
             sealed_sector,
@@ -897,12 +1126,7 @@ pub fn unseal_range<T: Into<PathBuf> + AsRef<Path>, R: Read, W: Write>(
             offset,
             num_bytes,
         ),
-        filecoin_proofs_v1::constants::SECTOR_SIZE_16_KIB => filecoin_proofs_v1::unseal_range::<
-            _,
-            _,
-            _,
-            filecoin_proofs_v1::constants::SectorShape16KiB,
-        >(
+        SECTOR_SIZE_16_KIB => filecoin_proofs_v1::unseal_range::<_, _, _, SectorShape16KiB>(
             config,
             cache_path,
             sealed_sector,
@@ -914,12 +1138,7 @@ pub fn unseal_range<T: Into<PathBuf> + AsRef<Path>, R: Read, W: Write>(
             offset,
             num_bytes,
         ),
-        filecoin_proofs_v1::constants::SECTOR_SIZE_32_KIB => filecoin_proofs_v1::unseal_range::<
-            _,
-            _,
-            _,
-            filecoin_proofs_v1::constants::SectorShape32KiB,
-        >(
+        SECTOR_SIZE_32_KIB => filecoin_proofs_v1::unseal_range::<_, _, _, SectorShape32KiB>(
             config,
             cache_path,
             sealed_sector,
@@ -931,12 +1150,7 @@ pub fn unseal_range<T: Into<PathBuf> + AsRef<Path>, R: Read, W: Write>(
             offset,
             num_bytes,
         ),
-        filecoin_proofs_v1::constants::SECTOR_SIZE_8_MIB => filecoin_proofs_v1::unseal_range::<
-            _,
-            _,
-            _,
-            filecoin_proofs_v1::constants::SectorShape8MiB,
-        >(
+        SECTOR_SIZE_8_MIB => filecoin_proofs_v1::unseal_range::<_, _, _, SectorShape8MiB>(
             config,
             cache_path,
             sealed_sector,
@@ -948,12 +1162,7 @@ pub fn unseal_range<T: Into<PathBuf> + AsRef<Path>, R: Read, W: Write>(
             offset,
             num_bytes,
         ),
-        filecoin_proofs_v1::constants::SECTOR_SIZE_16_MIB => filecoin_proofs_v1::unseal_range::<
-            _,
-            _,
-            _,
-            filecoin_proofs_v1::constants::SectorShape16MiB,
-        >(
+        SECTOR_SIZE_16_MIB => filecoin_proofs_v1::unseal_range::<_, _, _, SectorShape16MiB>(
             config,
             cache_path,
             sealed_sector,
@@ -965,12 +1174,7 @@ pub fn unseal_range<T: Into<PathBuf> + AsRef<Path>, R: Read, W: Write>(
             offset,
             num_bytes,
         ),
-        filecoin_proofs_v1::constants::SECTOR_SIZE_512_MIB => filecoin_proofs_v1::unseal_range::<
-            _,
-            _,
-            _,
-            filecoin_proofs_v1::constants::SectorShape512MiB,
-        >(
+        SECTOR_SIZE_512_MIB => filecoin_proofs_v1::unseal_range::<_, _, _, SectorShape512MiB>(
             config,
             cache_path,
             sealed_sector,
@@ -982,12 +1186,7 @@ pub fn unseal_range<T: Into<PathBuf> + AsRef<Path>, R: Read, W: Write>(
             offset,
             num_bytes,
         ),
-        filecoin_proofs_v1::constants::SECTOR_SIZE_1_GIB => filecoin_proofs_v1::unseal_range::<
-            _,
-            _,
-            _,
-            filecoin_proofs_v1::constants::SectorShape1GiB,
-        >(
+        SECTOR_SIZE_1_GIB => filecoin_proofs_v1::unseal_range::<_, _, _, SectorShape1GiB>(
             config,
             cache_path,
             sealed_sector,
@@ -999,12 +1198,7 @@ pub fn unseal_range<T: Into<PathBuf> + AsRef<Path>, R: Read, W: Write>(
             offset,
             num_bytes,
         ),
-        filecoin_proofs_v1::constants::SECTOR_SIZE_32_GIB => filecoin_proofs_v1::unseal_range::<
-            _,
-            _,
-            _,
-            filecoin_proofs_v1::constants::SectorShape32GiB,
-        >(
+        SECTOR_SIZE_32_GIB => filecoin_proofs_v1::unseal_range::<_, _, _, SectorShape32GiB>(
             config,
             cache_path,
             sealed_sector,
@@ -1016,12 +1210,7 @@ pub fn unseal_range<T: Into<PathBuf> + AsRef<Path>, R: Read, W: Write>(
             offset,
             num_bytes,
         ),
-        filecoin_proofs_v1::constants::SECTOR_SIZE_64_GIB => filecoin_proofs_v1::unseal_range::<
-            _,
-            _,
-            _,
-            filecoin_proofs_v1::constants::SectorShape64GiB,
-        >(
+        SECTOR_SIZE_64_GIB => filecoin_proofs_v1::unseal_range::<_, _, _, SectorShape64GiB>(
             config,
             cache_path,
             sealed_sector,
