@@ -13,10 +13,10 @@ anyhow = "1.0.26"
 bellperson = { version = "0.14.0", default-features = false }
 bincode = "1.1.2"
 serde = "1.0.104"
-filecoin-proofs-v1 = { package = "filecoin-proofs", version = "~8.0", default-features = false, git = "https://github.com/s1m0n21/petal-fil-proofs", branch = "releases/v8.0.1" }
-filecoin-hashers = { version = "~3.0", default-features = false, features = ["poseidon", "sha256"], git = "https://github.com/s1m0n21/petal-fil-proofs", branch = "releases/v8.0.1" }
-fr32 = { version = "~1.0", default-features = false, git = "https://github.com/s1m0n21/petal-fil-proofs", branch = "releases/v8.0.1" }
-storage-proofs-core = { version = "~8.0", default-features = false, git = "https://github.com/s1m0n21/petal-fil-proofs", branch = "releases/v8.0.1" }
+filecoin-proofs-v1 = { package = "filecoin-proofs", version = "~8.0", default-features = false, git = "https://github.com/s1m0n21/petal-fil-proofs", branch = "releases/v8.0.2" }
+filecoin-hashers = { version = "~3.0", default-features = false, features = ["poseidon", "sha256"], git = "https://github.com/s1m0n21/petal-fil-proofs", branch = "releases/v8.0.2" }
+fr32 = { version = "~1.0", default-features = false, git = "https://github.com/s1m0n21/petal-fil-proofs", branch = "releases/v8.0.2" }
+storage-proofs-core = { version = "~8.0", default-features = false, git = "https://github.com/s1m0n21/petal-fil-proofs", branch = "releases/v8.0.2" }
 
 [features]
 default = ["pairing", "gpu"]
